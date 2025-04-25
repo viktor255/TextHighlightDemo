@@ -56,6 +56,22 @@ This compiles the TypeScript to JavaScript and then runs the compiled JavaScript
 
 To experiment with TypeScript, simply edit the files in the `src` directory. The main entry point is `src/index.ts`.
 
+## Code Formatting
+
+This project uses Prettier for consistent code formatting. The following commands are available:
+
+```bash
+# Format all TypeScript files
+npm run format
+
+# Check if all TypeScript files are formatted correctly
+npm run format:check
+```
+
+Configuration files:
+- `.prettierrc` - Prettier configuration
+- `.prettierignore` - Files and directories to exclude from formatting
+
 ## Features Demonstrated
 
 The sample code in `src/index.ts` demonstrates:

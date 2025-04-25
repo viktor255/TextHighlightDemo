@@ -1,7 +1,5 @@
-// Import the cards data from cardsList.json
 import cardsData from './cardsList.json';
 
-// Define an interface for the Card structure
 interface Card {
     id: string;
     sCardId: string | null;
@@ -24,80 +22,101 @@ interface Card {
     } | null;
 }
 
-
 const cards = (cardsData as { cards: Card[] }).cards;
 
+// Write a function decorateHint that takes a Card object and returns JSX, in which it does the following:
+// Returns a modified hint
+// 1. If it finds a word from "front" in the "hint" text, it decorates it with <b>
+// 2. It decorates the word even if it originally had "the" (for nouns) or "to" (for verbs) at the beginning, which is no longer present in the text
+// 3. It also decorates words that only start with the front, e.g. front: "bad" => hint: "hurt <b>badly</b>"
 
-function shouldDecorate(hint: string, front: string): { shouldDecorate: boolean, wordToDecorate?: string, index?: number } {
+// Edge case list
+// what if there are multiple matches in one hint -- decorate the first one
+// we assume "the" "to" words which we want to ignore are only on first position
+
+function getNormalizedFront(front: string): string {
+    let normalizedFront = front.toLowerCase();
+    const frontWords = normalizedFront.split(/\s+/);
+
+    if (frontWords[0] === 'the' || frontWords[0] === 'to') {
+        normalizedFront = normalizedFront.replace(/the |to /g, '');
+    }
+
+    return normalizedFront;
+}
+
+type DecorateMatch = {
+    startIndex: number;
+    endIndex: number;
+};
+
+function getMatch(hint: string, front: string): DecorateMatch | null {
     const normalizedHint = hint.toLowerCase();
-    const normalizedFront = front.toLowerCase();
+    const normalizedFront = getNormalizedFront(front);
 
-    // We want to decorate one of words of Hint contain word from Front
-    // we are okay with prefix match all the time
-    // we are only okay with suffix match if remaining prefix is "the" or "to"
+    const matchRegex = new RegExp(normalizedFront, 'g');
+    const numberOfPotentialMatches = (normalizedHint.match(matchRegex) || []).length;
 
-    // Split hint into words
-    const hintWords = normalizedHint.split(/\s+/);
-    const originalHintWords = hint.split(/\s+/);
+    let currentPotentialMatchSearchIndex = 0;
 
-    for (let i = 0; i < hintWords.length; i++) {
-        const word = hintWords[i];
+    for (let i = 0; i < numberOfPotentialMatches; i++) {
+        const potentialMatchIndex = normalizedHint.indexOf(
+            normalizedFront,
+            currentPotentialMatchSearchIndex,
+        );
+        currentPotentialMatchSearchIndex = potentialMatchIndex + 1;
 
-        // Check for prefix match (word starts with front)
-        if (word.startsWith(normalizedFront)) {
-            return {
-                shouldDecorate: true,
-                wordToDecorate: originalHintWords[i],
-                index: i
-            };
-        }
+        const isThePotentialMatchAtStartOfWord =
+            potentialMatchIndex === 0 || // at the beginning of the string
+            !/[a-z0-9]/.test(normalizedHint[potentialMatchIndex - 1]); // or preceded by non-alphanumeric
 
-        // Check for suffix match (word ends with front)
-        if (word.endsWith(normalizedFront)) {
-            // For suffix match, check if the remaining prefix is "the" or "to"
-            const prefix = word.substring(0, word.length - normalizedFront.length);
-            if (prefix === "the" || prefix === "to") {
-                return {
-                    shouldDecorate: true,
-                    wordToDecorate: originalHintWords[i],
-                    index: i
-                };
+        const isMatchFoundAndValid = potentialMatchIndex !== -1 && isThePotentialMatchAtStartOfWord;
+
+        if (isMatchFoundAndValid) {
+            // End index needs to end on the hint word end
+            let endIndex = potentialMatchIndex + normalizedFront.length;
+            while (endIndex < normalizedHint.length && /[a-z0-9]/.test(normalizedHint[endIndex])) {
+                endIndex++;
             }
-        }
 
-        // Check if the word contains the front text and is an exact match
-        if (word === normalizedFront) {
             return {
-                shouldDecorate: true,
-                wordToDecorate: originalHintWords[i],
-                index: i
+                startIndex: potentialMatchIndex,
+                endIndex: endIndex,
             };
         }
     }
 
-    return { shouldDecorate: false };
+    return null;
 }
 
-function decorateHint({hint, front}: Card) {
-    const result = shouldDecorate(hint, front);
-    if (result.shouldDecorate && result.wordToDecorate && result.index !== undefined) {
-        // Split the hint into words
-        const hintWords = hint.split(/\s+/);
+type DecorateHintProps = {
+    hint: string;
+    front: string;
+};
 
-        // Decorate the matching word by wrapping it with asterisks
-        hintWords[result.index] = `**${result.wordToDecorate}**`;
+function decorateHint({ hint, front }: DecorateHintProps) {
+    const match = getMatch(hint, front);
+    const shouldDecorate = match !== null;
 
-        // Join the words back together
-        const decoratedHint = hintWords.join(' ');
+    if (shouldDecorate) {
+        const start = hint.slice(0, match.startIndex);
+        const matchedString = hint.slice(match.startIndex, match.endIndex);
+        const end = hint.slice(match.endIndex);
+
+        const decoratedHint = `<p>${start}<b>${matchedString}</b>${end}</p>`;
 
         console.log('Decorated one:');
         console.log('front:', front);
         console.log('original hint:', hint);
         console.log('decorated hint:', decoratedHint);
-        console.log('decorated word:', result.wordToDecorate);
-        console.log('match type:',
-            result.wordToDecorate.toLowerCase().startsWith(front.toLowerCase()) ? 'prefix match' :
-            (result.wordToDecorate.toLowerCase().endsWith(front.toLowerCase()) ? 'suffix match' : 'exact match'));
+
+        return decoratedHint;
+    } else {
+        console.log('No match');
+        console.log('front:', front);
+        console.log('hint:', hint);
+
+        return `<p>${hint}</p>`;
     }
 }
 
